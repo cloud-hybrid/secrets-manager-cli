@@ -14,3 +14,7 @@ go get github.com/aws/aws-sdk-go-v2/awserr
 go get github.com/aws/aws-sdk-go-v2/session
 go get github.com/aws/aws-sdk-go-v2/secretsmanager
 ```
+
+## SDK Example(s) ##
+
+1. [S3 `listObjects` Example](https://github.com/aws/aws-sdk-go-v2/tree/main/example/service/s3/listObjects)
