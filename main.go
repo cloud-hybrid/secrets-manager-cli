@@ -12,7 +12,7 @@ import (
 )
 
 func getSecret() {
-	secretName := "Capstone/Global/Credentials/Loader-IO"
+	secretName := "Organization/Environment/System/Service/Common-Name"
 	region := "us-east-2"
 
 	//Create a Secrets Manager client
