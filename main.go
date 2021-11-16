@@ -1,23 +1,23 @@
-// Use this code snippet in your app.
-// If you need more information about configurations or implementing the sample code, visit the AWS docs:   
-// https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/setting-up.html
+package main
 
 import (
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	"encoding/base64"
+	"fmt"
+	"os"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"encoding/base64"
-	"fmt"
+	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
-func getSecret() {
+func getSecret() string {
 	secretName := "Organization/Environment/System/Service/Common-Name"
 	region := "us-east-2"
 
-	//Create a Secrets Manager client
-	svc := secretsmanager.New(session.New(),
-                                  aws.NewConfig().WithRegion(region))
+	// Create a Secrets Manager client
+	svc := secretsmanager.New(session.New(), aws.NewConfig().WithRegion(region))
+
 	input := &secretsmanager.GetSecretValueInput{
 		SecretId:     aws.String(secretName),
 		VersionStage: aws.String("AWSCURRENT"), // VersionStage defaults to AWSCURRENT if unspecified
@@ -27,51 +27,61 @@ func getSecret() {
 	// See https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
 
 	result, err := svc.GetSecretValue(input)
+
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-				case secretsmanager.ErrCodeDecryptionFailure:
+		if signal, ok := err.(awserr.Error); ok {
+			switch signal.Code() {
+			case secretsmanager.ErrCodeDecryptionFailure:
+				fmt.Println("[Error] (ErrCodeDecryptionFailure): Exception during Decryption of KMS Key")
+
 				// Secrets Manager can't decrypt the protected secret text using the provided KMS key.
-				fmt.Println(secretsmanager.ErrCodeDecryptionFailure, aerr.Error())
+				fmt.Println(secretsmanager.ErrCodeDecryptionFailure, signal.Error())
 
-				case secretsmanager.ErrCodeInternalServiceError:
+			case secretsmanager.ErrCodeInternalServiceError:
+				fmt.Println("[Error] (ErrCodeInternalServiceError): AWS Service Exception")
 				// An error occurred on the server side.
-				fmt.Println(secretsmanager.ErrCodeInternalServiceError, aerr.Error())
+				fmt.Println(secretsmanager.ErrCodeInternalServiceError, signal.Error())
 
-				case secretsmanager.ErrCodeInvalidParameterException:
+			case secretsmanager.ErrCodeInvalidParameterException:
+				fmt.Println("[Error] (ErrCodeInvalidParameterException): Exception via Invalid Parameter")
 				// You provided an invalid value for a parameter.
-				fmt.Println(secretsmanager.ErrCodeInvalidParameterException, aerr.Error())
+				fmt.Println(secretsmanager.ErrCodeInvalidParameterException, signal.Error())
 
-				case secretsmanager.ErrCodeInvalidRequestException:
+			case secretsmanager.ErrCodeInvalidRequestException:
+				fmt.Println("[Error] (ErrCodeInvalidRequestException): Exception forming API Request")
 				// You provided a parameter value that is not valid for the current state of the resource.
-				fmt.Println(secretsmanager.ErrCodeInvalidRequestException, aerr.Error())
-
-				case secretsmanager.ErrCodeResourceNotFoundException:
+				fmt.Println(secretsmanager.ErrCodeInvalidRequestException, signal.Error())
+			case secretsmanager.ErrCodeResourceNotFoundException:
+				fmt.Println("[Error] (ErrCodeResourceNotFoundException): No Resource Found")
 				// We can't find the resource that you asked for.
-				fmt.Println(secretsmanager.ErrCodeResourceNotFoundException, aerr.Error())
+				fmt.Println(secretsmanager.ErrCodeResourceNotFoundException, signal.Error())
 			}
 		} else {
 			// Print the error, cast err to awserr.Error to get the Code and
 			// Message from an error.
 			fmt.Println(err.Error())
 		}
-		return
 	}
 
 	// Decrypts secret using the associated KMS CMK.
 	// Depending on whether the secret is a string or binary, one of these fields will be populated.
-	var secretString, decodedBinarySecret string
+	var data string = ""
 	if result.SecretString != nil {
-		secretString = *result.SecretString
+		data = *result.SecretString
 	} else {
 		decodedBinarySecretBytes := make([]byte, base64.StdEncoding.DecodedLen(len(result.SecretBinary)))
+
 		len, err := base64.StdEncoding.Decode(decodedBinarySecretBytes, result.SecretBinary)
+
 		if err != nil {
 			fmt.Println("Base64 Decode Error:", err)
-			return
+			os.Exit(1)
 		}
-		decodedBinarySecret = string(decodedBinarySecretBytes[:len])
+
+		data = string(decodedBinarySecretBytes[:len])
 	}
 
-	// Your code goes here.
+	return data
 }
+
+func main() { fmt.Println(getSecret()) }
